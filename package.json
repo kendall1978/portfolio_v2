@@ -1,0 +1,16 @@
+{
+  "name": "project-salary",
+  "private": true,
+  "scripts": {
+    "frontend:dev": "npm --prefix frontend run dev",
+    "frontend:build": "npm --prefix frontend run build",
+    "frontend:preview": "npm --prefix frontend run preview",
+    "frontend:install": "npm --prefix frontend install",
+    "backend:run": "cd backend && go run cmd/server/main.go",
+    "backend:test": "cd backend && go test ./... -v",
+    "dev": "concurrently -n backend,frontend -c blue,green \"npm run backend:run\" \"npm run frontend:dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
