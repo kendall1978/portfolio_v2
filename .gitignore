@@ -40,6 +40,9 @@ backend/.env
 *.swp
 *.swo
 
+# Logs
+backend/logs/
+
 # OS
 .DS_Store
 

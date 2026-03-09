@@ -169,11 +169,31 @@ func FetchOESData(backfill bool, localZipDir string) error {
 
 	var years []int
 	if backfill {
-		for y := 2018; y <= latestAvailable; y++ {
+		for y := 2022; y <= latestAvailable; y++ {
 			years = append(years, y)
 		}
 	} else {
 		years = []int{latestAvailable}
+	}
+
+	// Set up file logger
+	logDir := filepath.Join("logs")
+	sl, err := NewScrapeLogger(logDir)
+	if err != nil {
+		log.Printf("Warning: could not create scrape log file: %v (logging to stdout only)", err)
+	}
+	if sl != nil {
+		defer sl.Close()
+		sl.Log("=== OES Scrape Started ===")
+		sl.Log("Backfill: %v | Years: %v | LocalZipDir: %q", backfill, years, localZipDir)
+	}
+
+	logMsg := func(format string, args ...interface{}) {
+		if sl != nil {
+			sl.Log(format, args...)
+		} else {
+			log.Printf(format, args...)
+		}
 	}
 
 	scrapeLog := models.ScrapeLog{
@@ -184,64 +204,113 @@ func FetchOESData(backfill bool, localZipDir string) error {
 	database.DB.Create(&scrapeLog)
 
 	totalRecords := 0
+	var scrapeErrors []string
+
+	// Each BLS year has a state file (st) and a metro file (ma)
+	fileSuffixes := []struct {
+		suffix    string
+		label     string
+		areaType  int
+	}{
+		{"st", "state", 2},
+		{"ma", "metro", 4},
+	}
 
 	for _, year := range years {
-		// Check if data for this year already exists
-		var count int64
-		database.DB.Model(&models.SalarySnapshot{}).Where("year = ?", year).Count(&count)
-		if count > 0 {
-			log.Printf("OES data for %d already exists (%d records), skipping", year, count)
-			continue
-		}
-
 		yy := fmt.Sprintf("%02d", year%100)
+		logMsg("--- Year %d ---", year)
 
-		xlsxPath, cleanup, err := getExcelFile(year, yy, localZipDir)
-		if err != nil {
-			log.Printf("Failed to get Excel file for %d: %v", year, err)
-			continue
+		for _, fs := range fileSuffixes {
+			// Check if data for this year+file already exists
+			var count int64
+			database.DB.Model(&models.SalarySnapshot{}).
+				Joins("JOIN regions ON regions.id = salary_snapshots.region_id").
+				Where("salary_snapshots.year = ? AND regions.area_type = ?", year, fs.areaType).Count(&count)
+			if count > 0 {
+				logMsg("SKIP %d %s: already has %d records", year, fs.label, count)
+				continue
+			}
+
+			url := fmt.Sprintf("https://www.bls.gov/oes/special-requests/oesm%s%s.zip", yy, fs.suffix)
+			logMsg("DOWNLOAD %d %s: %s", year, fs.label, url)
+
+			xlsxPath, cleanup, err := getExcelFile(year, yy, fs.suffix, localZipDir)
+			if err != nil {
+				errMsg := fmt.Sprintf("FAIL %d %s download/extract: %v", year, fs.label, err)
+				logMsg(errMsg)
+				scrapeErrors = append(scrapeErrors, errMsg)
+				continue
+			}
+
+			logMsg("PARSE %d %s: %s", year, fs.label, xlsxPath)
+			regions, snapshots, err := ProcessExcelFile(xlsxPath, year)
+			cleanup()
+			if err != nil {
+				errMsg := fmt.Sprintf("FAIL %d %s parse: %v", year, fs.label, err)
+				logMsg(errMsg)
+				scrapeErrors = append(scrapeErrors, errMsg)
+				continue
+			}
+
+			// Log what was parsed
+			areaTypeCounts := make(map[int]int)
+			for _, r := range regions {
+				areaTypeCounts[r.AreaType]++
+			}
+			logMsg("PARSED %d %s: %d regions (area_types: %v), %d snapshots", year, fs.label, len(regions), areaTypeCounts, len(snapshots))
+
+			logMsg("IMPORT %d %s: writing to database...", year, fs.label)
+			imported, err := importToDatabase(regions, snapshots, year)
+			if err != nil {
+				errMsg := fmt.Sprintf("FAIL %d %s import: %v", year, fs.label, err)
+				logMsg(errMsg)
+				scrapeErrors = append(scrapeErrors, errMsg)
+				continue
+			}
+
+			totalRecords += imported
+			logMsg("OK %d %s: imported %d records", year, fs.label, imported)
 		}
-
-		regions, snapshots, err := ProcessExcelFile(xlsxPath, year)
-		cleanup()
-		if err != nil {
-			log.Printf("Failed to process Excel file for %d: %v", year, err)
-			continue
-		}
-
-		imported, err := importToDatabase(regions, snapshots, year)
-		if err != nil {
-			log.Printf("Failed to import data for %d: %v", year, err)
-			continue
-		}
-
-		totalRecords += imported
-		log.Printf("Imported %d records for year %d", imported, year)
 	}
 
 	now := time.Now()
-	scrapeLog.Status = "success"
+	if len(scrapeErrors) > 0 {
+		scrapeLog.Status = "partial"
+		scrapeLog.ErrorMessage = fmt.Sprintf("%d errors; see log file for details", len(scrapeErrors))
+		logMsg("=== Completed with %d errors ===", len(scrapeErrors))
+		for i, e := range scrapeErrors {
+			logMsg("  Error %d: %s", i+1, e)
+		}
+	} else {
+		scrapeLog.Status = "success"
+		logMsg("=== Completed successfully ===")
+	}
 	scrapeLog.RecordsFound = totalRecords
 	scrapeLog.CompletedAt = &now
 	database.DB.Save(&scrapeLog)
+
+	logMsg("Total records imported: %d", totalRecords)
+	if sl != nil {
+		logMsg("Log file: %s", sl.Path)
+	}
 
 	return nil
 }
 
 // getExcelFile returns the path to the xlsx file and a cleanup function.
-func getExcelFile(year int, yy string, localZipDir string) (string, func(), error) {
+func getExcelFile(year int, yy string, suffix string, localZipDir string) (string, func(), error) {
 	var zipPath string
 	var tempDir string
 
 	if localZipDir != "" {
 		// Look for local zip file
-		zipPath = filepath.Join(localZipDir, fmt.Sprintf("oesm%sst.zip", yy))
+		zipPath = filepath.Join(localZipDir, fmt.Sprintf("oesm%s%s.zip", yy, suffix))
 		if _, err := os.Stat(zipPath); os.IsNotExist(err) {
 			return "", func() {}, fmt.Errorf("local zip not found: %s", zipPath)
 		}
 	} else {
 		// Download from BLS
-		url := fmt.Sprintf("https://www.bls.gov/oes/special-requests/oesm%sst.zip", yy)
+		url := fmt.Sprintf("https://www.bls.gov/oes/special-requests/oesm%s%s.zip", yy, suffix)
 		log.Printf("Downloading %s", url)
 
 		var err error
@@ -250,7 +319,7 @@ func getExcelFile(year int, yy string, localZipDir string) (string, func(), erro
 			return "", func() {}, fmt.Errorf("create temp dir: %w", err)
 		}
 
-		zipPath = filepath.Join(tempDir, fmt.Sprintf("oesm%sst.zip", yy))
+		zipPath = filepath.Join(tempDir, fmt.Sprintf("oesm%s%s.zip", yy, suffix))
 		if err := downloadFile(url, zipPath); err != nil {
 			os.RemoveAll(tempDir)
 			return "", func() {}, fmt.Errorf("download: %w", err)
@@ -266,7 +335,7 @@ func getExcelFile(year int, yy string, localZipDir string) (string, func(), erro
 		return "", func() {}, fmt.Errorf("create extract dir: %w", err)
 	}
 
-	xlsxPath, err := extractXlsx(zipPath, extractDir)
+	xlsxPath, err := extractXlsx(zipPath, extractDir, suffix)
 	if err != nil {
 		os.RemoveAll(extractDir)
 		if tempDir != "" {
@@ -293,6 +362,8 @@ func downloadFile(url, dest string) error {
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
+	req.Header.Set("Referer", "https://www.bls.gov/oes/tables.htm")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -314,41 +385,77 @@ func downloadFile(url, dest string) error {
 	return err
 }
 
-func extractXlsx(zipPath, destDir string) (string, error) {
+// extractXlsx extracts the target xlsx from a zip. The prefix selects which
+// file to extract when a zip contains multiple xlsx files:
+//   - "state" zips: look for state_*.xlsx or oesm*st*.xlsx
+//   - "ma" (metro) zips: look for MSA_*.xlsx
+//   - "bos" zips: look for BOS_*.xlsx
+//
+// If prefix is empty, the first xlsx found is returned.
+func extractXlsx(zipPath, destDir, prefix string) (string, error) {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return "", err
 	}
 	defer r.Close()
 
+	var fallback *zip.File
 	for _, f := range r.File {
-		if filepath.Ext(f.Name) != ".xlsx" {
+		base := filepath.Base(f.Name)
+		if filepath.Ext(base) != ".xlsx" || strings.HasPrefix(base, "~$") {
 			continue
 		}
 
-		rc, err := f.Open()
-		if err != nil {
-			return "", err
+		if fallback == nil {
+			fallback = f
 		}
 
-		destPath := filepath.Join(destDir, filepath.Base(f.Name))
-		out, err := os.Create(destPath)
-		if err != nil {
-			rc.Close()
-			return "", err
+		upperBase := strings.ToUpper(base)
+		match := false
+		switch prefix {
+		case "st":
+			match = strings.HasPrefix(upperBase, "STATE_") || strings.Contains(upperBase, "ST")
+		case "ma":
+			match = strings.HasPrefix(upperBase, "MSA_")
+		case "bos":
+			match = strings.HasPrefix(upperBase, "BOS_")
+		default:
+			match = true
 		}
 
-		_, err = io.Copy(out, rc)
-		rc.Close()
-		out.Close()
-		if err != nil {
-			return "", err
+		if match {
+			return extractZipFile(f, destDir)
 		}
+	}
 
-		return destPath, nil
+	// Fall back to first xlsx if no prefix match
+	if fallback != nil {
+		return extractZipFile(fallback, destDir)
 	}
 
 	return "", fmt.Errorf("no xlsx file found in zip")
+}
+
+func extractZipFile(f *zip.File, destDir string) (string, error) {
+	rc, err := f.Open()
+	if err != nil {
+		return "", err
+	}
+	defer rc.Close()
+
+	destPath := filepath.Join(destDir, filepath.Base(f.Name))
+	out, err := os.Create(destPath)
+	if err != nil {
+		return "", err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, rc)
+	if err != nil {
+		return "", err
+	}
+
+	return destPath, nil
 }
 
 func importToDatabase(regions []OESRegion, snapshots []OESSnapshot, year int) (int, error) {
@@ -357,15 +464,19 @@ func importToDatabase(regions []OESRegion, snapshots []OESSnapshot, year int) (i
 
 	for _, r := range regions {
 		var dbRegion models.Region
-		result := database.DB.Where("area_code = ?", r.AreaCode).FirstOrCreate(&dbRegion, models.Region{
-			AreaCode:  r.AreaCode,
-			AreaTitle: r.AreaTitle,
-			AreaType:  r.AreaType,
-			State:     r.State,
-			StateCode: r.StateCode,
-		})
+		result := database.DB.Where("area_code = ?", r.AreaCode).First(&dbRegion)
 		if result.Error != nil {
-			return 0, fmt.Errorf("upsert region %s: %w", r.AreaCode, result.Error)
+			// Not found — create it
+			dbRegion = models.Region{
+				AreaCode:  r.AreaCode,
+				AreaTitle: r.AreaTitle,
+				AreaType:  r.AreaType,
+				State:     r.State,
+				StateCode: r.StateCode,
+			}
+			if err := database.DB.Create(&dbRegion).Error; err != nil {
+				return 0, fmt.Errorf("create region %s: %w", r.AreaCode, err)
+			}
 		}
 		regionMap[r.AreaCode] = dbRegion
 	}
