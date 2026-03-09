@@ -65,4 +65,51 @@ func Setup(r *gin.Engine) {
 		scrape.POST("/trigger", handlers.ScrapeTrigger)
 		scrape.GET("/logs", handlers.ScrapeLogs)
 	}
+
+	// Static file serving for uploads
+	r.Static("/uploads", "./uploads")
+
+	// Public portfolio routes — no auth required
+	api.GET("/blog", handlers.ListBlogPosts)
+	api.GET("/blog/:id", handlers.GetBlogPost)
+	api.GET("/home-sections", handlers.ListHomeSections)
+	api.GET("/social-links", handlers.ListSocialLinks)
+	api.GET("/site-settings", handlers.GetSiteSettings)
+
+	// Protected portfolio admin routes
+	blogAdmin := api.Group("/blog")
+	blogAdmin.Use(middleware.AuthRequired())
+	{
+		blogAdmin.POST("", handlers.CreateBlogPost)
+		blogAdmin.PUT("/:id", handlers.UpdateBlogPost)
+		blogAdmin.DELETE("/:id", handlers.DeleteBlogPost)
+	}
+
+	homeSections := api.Group("/home-sections")
+	homeSections.Use(middleware.AuthRequired())
+	{
+		homeSections.POST("", handlers.CreateHomeSection)
+		homeSections.PUT("/:id", handlers.UpdateHomeSection)
+		homeSections.DELETE("/:id", handlers.DeleteHomeSection)
+	}
+
+	socialLinks := api.Group("/social-links")
+	socialLinks.Use(middleware.AuthRequired())
+	{
+		socialLinks.POST("", handlers.CreateSocialLink)
+		socialLinks.PUT("/:id", handlers.UpdateSocialLink)
+		socialLinks.DELETE("/:id", handlers.DeleteSocialLink)
+	}
+
+	siteSettings := api.Group("/site-settings")
+	siteSettings.Use(middleware.AuthRequired())
+	{
+		siteSettings.PUT("", handlers.UpdateSiteSettings)
+	}
+
+	upload := api.Group("/upload")
+	upload.Use(middleware.AuthRequired())
+	{
+		upload.POST("", handlers.UploadImage)
+	}
 }

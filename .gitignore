@@ -48,3 +48,9 @@ backend/logs/
 
 # MCP
 .mcp.json
+
+# Uploads
+backend/uploads/
+
+# Firebase
+backend/firebase-service-account.json

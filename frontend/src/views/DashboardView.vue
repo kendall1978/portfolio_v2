@@ -1,17 +1,6 @@
 <template>
   <div class="max-w-6xl mx-auto p-4">
-    <header class="flex justify-between items-center mb-8 pb-4 border-b border-gray-200">
-      <h1 class="text-2xl font-bold text-gray-900">Kendall Roberts Portfolio</h1>
-      <nav class="flex gap-4 items-center">
-        <router-link to="/" class="text-indigo-600 hover:underline">Dashboard</router-link>
-        <router-link to="/settings" class="text-indigo-600 hover:underline">Settings</router-link>
-        <router-link to="/scrape" class="text-indigo-600 hover:underline">Data Management</router-link>
-        <button @click="logout"
-          class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm">
-          Logout
-        </button>
-      </nav>
-    </header>
+    <h1 class="text-2xl font-bold mb-8 pb-4 border-b" style="color: var(--text-primary); border-color: var(--border-color)">Salary Dashboard</h1>
 
     <!-- Filters -->
     <section class="bg-white p-4 rounded-lg shadow-sm mb-6">
@@ -132,16 +121,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 import { useSalaryStore } from '@/stores/salary'
 import RegionalMap from '@/components/RegionalMap.vue'
 import StateComparisonChart from '@/components/StateComparisonChart.vue'
 import SalaryTrendsChart from '@/components/SalaryTrendsChart.vue'
 
-const authStore = useAuthStore()
 const salaryStore = useSalaryStore()
-const router = useRouter()
 
 const comparisons = computed(() => salaryStore.compareData?.comparisons ?? [])
 const userSalary = computed(() => salaryStore.compareData?.user_salary ?? 0)
@@ -191,8 +176,4 @@ function removeOcc(code: string) {
   salaryStore.selectedOccCodes = salaryStore.selectedOccCodes.filter(c => c !== code)
 }
 
-function logout() {
-  authStore.logout()
-  router.push('/login')
-}
 </script>
