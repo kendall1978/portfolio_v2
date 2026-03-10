@@ -39,3 +39,24 @@ body {
     color: var(--text-primary);
     transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+textarea,
+select {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 25%, transparent);
+    border-color: var(--accent-color);
+}
+
+::placeholder {
+    color: var(--text-muted);
+}

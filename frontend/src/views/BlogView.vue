@@ -6,18 +6,20 @@
       No posts yet.
     </div>
 
-    <div class="grid gap-8">
+    <div class="columns-1 md:columns-2 gap-6 space-y-6">
       <article
         v-for="post in store.blogPosts"
         :key="post.id"
-        class="rounded-xl border overflow-hidden transition-shadow hover:shadow-md"
+        class="break-inside-avoid rounded-xl border overflow-hidden transition-shadow hover:shadow-md"
         :style="{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }"
       >
         <img
           v-if="post.image_path"
           :src="imageUrl(post.image_path)"
           :alt="post.title"
-          class="w-full h-48 object-cover"
+          class="w-full object-cover"
+          loading="lazy"
+          @error="($event.target as HTMLImageElement).style.display = 'none'"
         />
         <div class="p-6">
           <time class="text-xs uppercase tracking-wide" style="color: var(--text-muted)">
@@ -54,9 +56,10 @@ function formatDate(dateStr: string): string {
 }
 
 function imageUrl(path: string): string {
-    // If it's already a full URL (e.g., Firebase URL from migration), use as-is
     if (path.startsWith('http')) return path
-    // Otherwise it's a local upload path
+    // Local paths starting with / are served from public/
+    if (path.startsWith('/images/')) return path
+    // Backend upload paths
     return `http://localhost:8080${path}`
 }
 </script>

@@ -1,6 +1,6 @@
 <template>
-  <v-chart v-if="mapReady" :option="chartOption" style="height: 500px" autoresize />
-  <div v-else class="h-[500px] flex items-center justify-center text-gray-400">Loading map...</div>
+  <v-chart v-if="mapReady" :option="chartOption" style="width: 100%; height: 100%" autoresize />
+  <div v-else class="w-full h-full flex items-center justify-center" style="color: var(--text-muted)">Loading map...</div>
 </template>
 
 <script setup lang="ts">

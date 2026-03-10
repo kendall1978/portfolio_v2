@@ -191,14 +191,14 @@ function editBlogPost(post: BlogPost) {
     editingBlogId.value = post.id
     blogForm.title = post.title
     blogForm.content = post.content
-    blogForm.date = post.date.split('T')[0]
+    blogForm.date = post.date.split('T')[0] ?? ''
     blogForm.image_path = post.image_path
     showBlogForm.value = true
 }
 
 function onBlogImageSelect(e: Event) {
     const input = e.target as HTMLInputElement
-    if (input.files?.length) blogImageFile = input.files[0]
+    if (input.files?.length) blogImageFile = input.files[0] ?? null
 }
 
 async function saveBlogPost() {
