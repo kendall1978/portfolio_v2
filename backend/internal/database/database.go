@@ -39,5 +39,10 @@ func Migrate() error {
 		&models.Region{},
 		&models.SalarySnapshot{},
 		&models.ScrapeLog{},
+		// Portfolio models
+		&models.BlogPost{},
+		&models.HomeSection{},
+		&models.SocialLink{},
+		&models.SiteSetting{},
 	)
 }

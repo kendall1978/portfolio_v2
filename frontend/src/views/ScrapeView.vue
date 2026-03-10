@@ -1,69 +1,72 @@
 <template>
-  <div class="max-w-4xl mx-auto p-4">
-    <header class="flex justify-between items-center mb-8">
-      <h1 class="text-2xl font-bold text-gray-900">Data Management</h1>
-      <router-link to="/" class="text-indigo-600 hover:underline">Back to Dashboard</router-link>
-    </header>
+  <div class="max-w-4xl mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold mb-8 pb-4 border-b" style="color: var(--text-primary); border-color: var(--border-color)">Data Management</h1>
 
-    <section class="bg-white p-6 rounded-lg shadow-sm mb-6">
-      <h2 class="text-lg font-semibold text-gray-800 mb-2">Import OES Data</h2>
-      <p class="text-gray-600 text-sm mb-4">Import salary data from BLS Occupational Employment Statistics files.</p>
+    <section class="p-6 rounded-xl border mb-6" :style="{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }">
+      <h2 class="text-lg font-semibold mb-2" style="color: var(--text-primary)">Import OES Data</h2>
+      <p class="text-sm mb-4" style="color: var(--text-secondary)">Import salary data from BLS Occupational Employment Statistics files.</p>
       <div class="flex flex-col gap-3 mb-4">
-        <label class="flex items-center gap-2 text-sm">
-          <input type="checkbox" v-model="backfill" class="rounded" />
+        <label class="flex items-center gap-2 text-sm" style="color: var(--text-secondary)">
+          <input type="checkbox" v-model="backfill" class="rounded accent-[var(--accent-color)]" />
           <span>Backfill historical data (2018-present)</span>
         </label>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Local zip directory (optional)</label>
+          <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary)">Local zip directory (optional)</label>
           <input v-model="localZipDir" type="text" placeholder="/home/user/Downloads"
-            class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <p class="text-xs text-gray-400 mt-1">Leave empty to download from BLS automatically.</p>
+            class="w-full px-3 py-2 border rounded text-sm" />
+          <p class="text-xs mt-1" style="color: var(--text-muted)">Leave empty to download from BLS automatically.</p>
         </div>
       </div>
       <button @click="triggerScrape" :disabled="scraping"
-        class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed">
+        class="px-4 py-2 rounded text-white text-sm bg-accent hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed transition-colors">
         {{ scraping ? 'Importing...' : 'Import Data' }}
       </button>
-      <p v-if="scrapeMsg" class="mt-2 text-sm text-gray-600">{{ scrapeMsg }}</p>
+      <p v-if="scrapeMsg" class="mt-2 text-sm" style="color: var(--text-secondary)">{{ scrapeMsg }}</p>
     </section>
 
-    <section class="bg-white p-6 rounded-lg shadow-sm">
+    <section class="p-6 rounded-xl border" :style="{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }">
       <div class="flex justify-between items-center mb-4">
-        <h2 class="text-lg font-semibold text-gray-800">Scrape History</h2>
+        <h2 class="text-lg font-semibold" style="color: var(--text-primary)">Scrape History</h2>
         <button @click="fetchLogs"
-          class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm">
+          class="px-3 py-1.5 rounded text-sm transition-colors"
+          :style="{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }">
           Refresh Logs
         </button>
       </div>
-      <div class="overflow-x-auto">
+      <div class="overflow-x-auto rounded-lg border" :style="{ borderColor: 'var(--border-color)' }">
         <table class="w-full border-collapse">
           <thead>
-            <tr class="bg-gray-50">
-              <th class="px-4 py-3 text-left font-semibold text-sm border-b border-gray-200">Source</th>
-              <th class="px-4 py-3 text-left font-semibold text-sm border-b border-gray-200">Status</th>
-              <th class="px-4 py-3 text-left font-semibold text-sm border-b border-gray-200">Records</th>
-              <th class="px-4 py-3 text-left font-semibold text-sm border-b border-gray-200">Started</th>
-              <th class="px-4 py-3 text-left font-semibold text-sm border-b border-gray-200">Completed</th>
-              <th class="px-4 py-3 text-left font-semibold text-sm border-b border-gray-200">Error</th>
+            <tr :style="{ backgroundColor: 'var(--bg-secondary)' }">
+              <th class="px-4 py-3 text-left font-semibold text-sm" style="color: var(--text-secondary)">Source</th>
+              <th class="px-4 py-3 text-left font-semibold text-sm" style="color: var(--text-secondary)">Status</th>
+              <th class="px-4 py-3 text-left font-semibold text-sm" style="color: var(--text-secondary)">Records</th>
+              <th class="px-4 py-3 text-left font-semibold text-sm" style="color: var(--text-secondary)">Started</th>
+              <th class="px-4 py-3 text-left font-semibold text-sm" style="color: var(--text-secondary)">Completed</th>
+              <th class="px-4 py-3 text-left font-semibold text-sm" style="color: var(--text-secondary)">Error</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="log in logs" :key="log.id" class="border-b border-gray-100">
-              <td class="px-4 py-3 text-sm">{{ log.source }}</td>
+            <tr v-for="log in logs" :key="log.id"
+              class="border-t transition-colors"
+              :style="{ borderColor: 'var(--border-color)' }"
+              style="cursor: default;"
+              @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--bg-secondary)'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'">
+              <td class="px-4 py-3 text-sm" style="color: var(--text-primary)">{{ log.source }}</td>
               <td class="px-4 py-3 text-sm">
                 <span :class="{
-                  'text-green-600': log.status === 'success',
-                  'text-red-600': log.status === 'failed',
-                  'text-yellow-600': log.status === 'running',
+                  'text-green-500': log.status === 'success',
+                  'text-red-500': log.status === 'failed',
+                  'text-yellow-500': log.status === 'running',
                 }">{{ log.status }}</span>
               </td>
-              <td class="px-4 py-3 text-sm">{{ log.records_found }}</td>
-              <td class="px-4 py-3 text-sm">{{ formatDate(log.started_at) }}</td>
-              <td class="px-4 py-3 text-sm">{{ log.completed_at ? formatDate(log.completed_at) : '-' }}</td>
-              <td class="px-4 py-3 text-sm text-red-600">{{ log.error_message || '-' }}</td>
+              <td class="px-4 py-3 text-sm" style="color: var(--text-primary)">{{ log.records_found }}</td>
+              <td class="px-4 py-3 text-sm" style="color: var(--text-secondary)">{{ formatDate(log.started_at) }}</td>
+              <td class="px-4 py-3 text-sm" style="color: var(--text-secondary)">{{ log.completed_at ? formatDate(log.completed_at) : '-' }}</td>
+              <td class="px-4 py-3 text-sm text-red-500">{{ log.error_message || '-' }}</td>
             </tr>
             <tr v-if="logs.length === 0">
-              <td colspan="6" class="px-4 py-6 text-center text-gray-400 text-sm">No scrape history yet.</td>
+              <td colspan="6" class="px-4 py-6 text-center text-sm" style="color: var(--text-muted)">No scrape history yet.</td>
             </tr>
           </tbody>
         </table>

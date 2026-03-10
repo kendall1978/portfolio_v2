@@ -1,1 +1,62 @@
 @import "tailwindcss";
+
+@theme {
+    --color-accent: var(--accent-color, #14b8a6);
+    --color-accent-hover: var(--accent-hover, #0d9488);
+    --color-accent-light: var(--accent-light, #ccfbf1);
+    --color-accent-muted: var(--accent-muted, #5eead4);
+}
+
+:root {
+    --accent-color: #14b8a6;
+    --accent-hover: #0d9488;
+    --accent-light: #ccfbf1;
+    --accent-muted: #5eead4;
+}
+
+:root.dark {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-card: #1e293b;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --border-color: #334155;
+}
+
+:root:not(.dark) {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8fafc;
+    --bg-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --border-color: #e2e8f0;
+}
+
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+textarea,
+select {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 25%, transparent);
+    border-color: var(--accent-color);
+}
+
+::placeholder {
+    color: var(--text-muted);
+}
